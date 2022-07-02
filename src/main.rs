@@ -34,14 +34,14 @@ struct ProxyArgs {
 #[derive(Args)]
 struct PubArgs {
     /// Specify the host and port to publish messages to in URL format.
-    #[clap(short, long, default_value = "tcp://*:5555")]
+    #[clap(short, long, default_value = "tcp://localhost:5555")]
     frontend: String,
 }
 
 #[derive(Args)]
 struct SubArgs {
     /// Specify the host and port to subscribe messages from in URL format.
-    #[clap(short, long, default_value = "tcp://*:6666")]
+    #[clap(short, long, default_value = "tcp://localhost:6666")]
     backend: String,
 }
 
@@ -51,8 +51,8 @@ fn main() {
 
     match &cli.command {
         Commands::Proxy(args) => {
-            let frontend = context.socket(zmq::SUB).unwrap();
-            let backend = context.socket(zmq::PUB).unwrap();
+            let frontend = context.socket(zmq::XSUB).unwrap();
+            let backend = context.socket(zmq::XPUB).unwrap();
 
             frontend
                 .bind(&args.frontend)
@@ -61,6 +61,41 @@ fn main() {
 
             zmq::proxy(&frontend, &backend).expect("failed to proxy");
         }
-        _ => todo!(),
+        Commands::Pub(args) => {
+            let frontend = context.socket(zmq::PUB).unwrap();
+
+            frontend
+                .connect(&args.frontend)
+                .expect("failed connecting frontend");
+
+            let stdin = std::io::stdin();
+            let mut line = String::new();
+
+            loop {
+                line.clear();
+                stdin.read_line(&mut line).expect("failed reading line");
+
+                frontend
+                    .send(&line.as_bytes(), 0)
+                    .expect("failed sending message");
+            }
+        }
+        Commands::Sub(args) => {
+            let backend = context.socket(zmq::SUB).unwrap();
+
+            backend
+                .connect(&args.backend)
+                .expect("failed connecting backend");
+            backend.set_subscribe(b"").expect("failed to subscribe");
+
+            loop {
+                let msg = backend
+                    .recv_string(0)
+                    .expect("failed receiving message")
+                    .unwrap();
+
+                println!("{}", msg);
+            }
+        }
     }
 }
