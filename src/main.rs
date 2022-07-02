@@ -29,6 +29,11 @@ struct ProxyArgs {
     /// Specify the host and port to forward messages in URL format.
     #[clap(short, long, default_value = "tcp://*:6666")]
     backend: String,
+
+    /// If set to true, the proxy will spawn a new thread to capture
+    /// and log all messages going through it.
+    #[clap(short, long)]
+    capture: bool,
 }
 
 #[derive(Args)]
@@ -45,21 +50,45 @@ struct SubArgs {
     backend: String,
 }
 
+fn capture_logger(context: &zmq::Context) {
+    let receiver = context.socket(zmq::PAIR).unwrap();
+    receiver
+        .connect("inproc://capture")
+        .expect("failed to connect to capture socket");
+
+    loop {
+        let msg = receiver.recv_msg(0).unwrap();
+        println!("{:?}", msg);
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
     let context = zmq::Context::new();
 
     match &cli.command {
         Commands::Proxy(args) => {
-            let frontend = context.socket(zmq::XSUB).unwrap();
-            let backend = context.socket(zmq::XPUB).unwrap();
+            let mut frontend = context.socket(zmq::XSUB).unwrap();
+            let mut backend = context.socket(zmq::XPUB).unwrap();
 
             frontend
                 .bind(&args.frontend)
                 .expect("failed binding frontend");
             backend.bind(&args.backend).expect("failed binding backend");
 
-            zmq::proxy(&frontend, &backend).expect("failed to proxy");
+            if args.capture {
+                let mut capture_receiver = context.socket(zmq::PAIR).unwrap();
+                capture_receiver
+                    .bind("inproc://capture")
+                    .expect("failed to bind capture receiver socket");
+
+                std::thread::spawn(move || capture_logger(&context));
+
+                zmq::proxy_with_capture(&mut frontend, &mut backend, &mut capture_receiver)
+                    .expect("failed to proxy");
+            } else {
+                zmq::proxy(&frontend, &backend).expect("failed to proxy");
+            }
         }
         Commands::Pub(args) => {
             let frontend = context.socket(zmq::PUB).unwrap();

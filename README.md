@@ -22,6 +22,8 @@ USAGE:
 OPTIONS:
     -b, --backend <BACKEND>      Specify the host and port to forward messages in URL format
                                  [default: tcp://*:6666]
+    -c, --capture                If set to true, the proxy will spawn a new thread to capture and
+                                 log all messages going through it
     -f, --frontend <FRONTEND>    Specify the host and port to receive messages in URL format
                                  [default: tcp://*:5555]
     -h, --help                   Print help information
