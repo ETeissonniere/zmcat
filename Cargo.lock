@@ -299,6 +299,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "zmcat"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "zmq",
+]
+
+[[package]]
 name = "zmq"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -308,14 +316,6 @@ dependencies = [
  "libc",
  "log",
  "zmq-sys",
-]
-
-[[package]]
-name = "zmq-broker"
-version = "0.1.0"
-dependencies = [
- "clap",
- "zmq",
 ]
 
 [[package]]
